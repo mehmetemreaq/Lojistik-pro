@@ -5,7 +5,7 @@ import qrcode
 from PIL import Image
 from io import BytesIO
 
-# --- 1. KURUMSAL TEMA VE GÜVENLİK ---
+# --- 1. KURUMSAL TEMA ---
 st.set_page_config(page_title="Lojistik Pro Enterprise", page_icon="🏢", layout="wide")
 
 st.markdown("""
@@ -21,7 +21,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. KULLANICI YÖNETİMİ ---
+# --- 2. KULLANICI SİSTEMİ ---
 if 'user_db' not in st.session_state:
     st.session_state.user_db = {
         "admin": {"pw": "12345", "name": "Mehmet Emre Türkyılmaz", "role": "Yönetici"},
@@ -33,17 +33,19 @@ if 'logged_in' not in st.session_state:
     st.session_state.current_user = None
 
 # --- 3. VERİ BAĞLANTISI (HATA KORUMALI) ---
+# BURAYA KENDİ GOOGLE SHEETS LİNKİNİZİ YAPIŞTIRIN
 URL = "https://docs.google.com/spreadsheets/d/SAYFA_ID_BURAYA/edit#gid=0"
 
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
     df = conn.read(spreadsheet=URL)
-    # Eksik sütunları otomatik oluşturarak KeyError'ı engelle
-    for col in ['ID', 'Alici', 'Durum', 'Mesafe', 'Yakit', 'Sofor_Durumu']:
+    # Fotoğraftaki KeyError'ı engellemek için eksik sütunları otomatik oluştur
+    gereken_sutunlar = ['ID', 'Alici', 'Durum', 'Mesafe', 'Yakit', 'Sofor_Durumu']
+    for col in gereken_sutunlar:
         if col not in df.columns:
-            df[col] = "Veri Yok" if col in ['Alici', 'Durum', 'Sofor_Durumu'] else 0
+            df[col] = "Belirtilmedi" if col in ['Alici', 'Durum', 'Sofor_Durumu'] else 0
 except Exception as e:
-    # Bağlantı yoksa veya hata varsa örnek veri göster (Uygulama kapanmaz)
+    # Bağlantı hatası olursa örnek verileri göster ki uygulama çökmesin
     df = pd.DataFrame([{"ID": "TR-101", "Alici": "Ekol Lojistik", "Durum": "Yolda", "Mesafe": 150, "Yakit": 12, "Sofor_Durumu": "Sürüşte"}])
 
 # --- 4. GİRİŞ VE ANA PANEL ---
@@ -51,15 +53,15 @@ def draw_header():
     col1, col2 = st.columns([1, 6])
     with col1: st.image("https://cdn-icons-png.flaticon.com/512/4090/4090434.png", width=90)
     with col2: 
-        st.title("Lojistik Pro | Yönetim Portalı")
-        st.caption("Uşak Lojistik Operasyon Merkezi")
+        st.title("Lojistik Pro | Kurumsal Operasyon Portalı")
+        st.caption("Uşak Lojistik Yönetimi - Profesyonel Takip Sistemi")
     st.divider()
 
 if not st.session_state.logged_in:
     draw_header()
     u = st.text_input("Kullanıcı Adı")
     p = st.text_input("Şifre", type="password")
-    if st.button("Giriş Yap"):
+    if st.button("Sisteme Eriş"):
         if u in st.session_state.user_db and st.session_state.user_db[u]["pw"] == p:
             st.session_state.logged_in = True
             st.session_state.current_user = u
@@ -69,33 +71,30 @@ else:
     user = st.session_state.user_db[st.session_state.current_user]
     with st.sidebar:
         st.title(f"👤 {user['name']}")
-        if st.button("🚪 Çıkış"):
+        if st.sidebar.button("🚪 Güvenli Çıkış"):
             st.session_state.logged_in = False
             st.rerun()
 
     draw_header()
 
     if user['role'] == "Yönetici":
-        t1, t2 = st.tabs(["📊 Filo Takibi", "⚙️ Kayıt Yönetimi"])
+        t1, t2 = st.tabs(["📊 Filo Takibi", "⚙️ Kayıt Yönetimi (Ekle/Sil/Düzenle)"])
         with t1:
             st.dataframe(df, use_container_width=True)
             st.map()
         with t2:
-            st.subheader("İşlem Seçin")
-            islem = st.radio("", ["Yeni Ekle", "Güncelle", "Sil"])
-            
-            # --- EKLEME VE SİLME FONKSİYONLARI ---
-            if islem == "Yeni Ekle":
+            islem = st.radio("İşlem Seçin:", ["Yeni Kayıt Ekle", "Kayıt Sil"])
+            if islem == "Yeni Kayıt Ekle":
                 with st.form("ekle"):
                     f_id = st.text_input("ID")
                     f_alici = st.text_input("Firma")
-                    if st.form_submit_button("Excel'e Yaz"):
+                    if st.form_submit_button("Excel'e Kaydet"):
                         yeni_df = pd.concat([df, pd.DataFrame([{"ID": f_id, "Alici": f_alici, "Durum": "Yüklendi", "Mesafe": 0}])], ignore_index=True)
                         conn.update(spreadsheet=URL, data=yeni_df)
                         st.success("Eklendi!")
                         st.rerun()
-            elif islem == "Sil":
-                sil_id = st.selectbox("ID Seç", df['ID'].tolist())
+            elif islem == "Kayıt Sil":
+                sil_id = st.selectbox("Silinecek ID", df['ID'].tolist())
                 if st.button("❌ KALICI OLARAK SİL"):
                     yeni_df = df[df['ID'] != sil_id]
                     conn.update(spreadsheet=URL, data=yeni_df)
