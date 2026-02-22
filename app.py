@@ -211,4 +211,49 @@ else:
         st.info("📍 Mevcut Görev: Uşak OSB -> İzmir Limanı")
         if st.button("✅ İşi Onayla"): st.success("İş kabul edildi.")
 
+# --- GOOGLE SHEETS BAĞLANTISI ---
+# Not: spreadsheet parametresi için sadece sayfanın adını veya URL'sini kullanın.
+try:
+    conn = st.connection("gsheets", type=GSheetsConnection)
+    # Veriyi Oku
+    df = conn.read(spreadsheet="SİZİN_GOOGLE_SHEETS_LİNKİNİZ")
+except Exception as e:
+    st.error(f"Bağlantı Hatası: {e}")
 
+if user['role'] == "Yönetici":
+    t_yonetim = st.tabs(["⚙️ Kayıt Yönetimi"])[0]
+    
+    with t_yonetim:
+        islem = st.radio("Yapmak İstediğiniz İşlem:", ["Yeni Kayıt Ekle", "Kayıt Düzenle", "Kayıt Sil"])
+
+        # --- EKLEME ---
+        if islem == "Yeni Kayıt Ekle":
+            with st.form("ekle"):
+                f1 = st.text_input("ID (Örn: TR-500)")
+                f2 = st.text_input("Alıcı Firma")
+                f3 = st.selectbox("Durum", ["Yüklendi", "Yolda", "Teslim Edildi"])
+                if st.form_submit_button("Veritabanına Kaydet"):
+                    yeni_satir = pd.DataFrame([{"ID": f1, "Alici": f2, "Durum": f3, "Mesafe": 0, "Yakit": 0}])
+                    guncel_df = pd.concat([df, yeni_satir], ignore_index=True)
+                    conn.update(spreadsheet="SİZİN_GOOGLE_SHEETS_LİNKİNİZ", data=guncel_df)
+                    st.success("Yeni kayıt eklendi!")
+                    st.rerun()
+
+        # --- DÜZENLEME ---
+        elif islem == "Kayıt Düzenle":
+            secilen_id = st.selectbox("Düzenlenecek ID", df['ID'].tolist())
+            yeni_durum = st.selectbox("Yeni Durum Atayın", ["Yüklendi", "Yolda", "Teslim Edildi"])
+            if st.button("Güncellemeyi Kaydet"):
+                df.loc[df['ID'] == secilen_id, 'Durum'] = yeni_durum
+                conn.update(spreadsheet="SİZİN_GOOGLE_SHEETS_LİNKİNİZ", data=df)
+                st.success("Kayıt güncellendi!")
+                st.rerun()
+
+        # --- SİLME ---
+        elif islem == "Kayıt Sil":
+            silinecek_id = st.selectbox("Silinecek ID", df['ID'].tolist())
+            if st.button("❌ KALICI OLARAK SİL"):
+                guncel_df = df[df['ID'] != silinecek_id]
+                conn.update(spreadsheet="SİZİN_GOOGLE_SHEETS_LİNKİNİZ", data=guncel_df)
+                st.warning("Kayıt veritabanından silindi!")
+                st.rerun()
