@@ -86,7 +86,7 @@ else:
         with tab2:
             st.subheader("💰 Yakıt ve Performans Analizi")
             c1, c2, c3 = st.columns(3)
-            toplam_km = df['Mesafe'].sum()
+            toplam_km = df['Mesafe'].sum() if 'Mesafe' in df.columns else 0
             ort_yakit = df['Yakit'].mean()
             
             c1.metric("Toplam Mesafe", f"{toplam_km} KM")
@@ -144,3 +144,4 @@ else:
 # streamlit-gsheets-connection
 # qrcode
 # Pillow
+
