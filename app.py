@@ -6,117 +6,150 @@ from PIL import Image
 from io import BytesIO
 import datetime
 
-# --- 1. SAYFA YAPILANDIRMASI ---
-st.set_page_config(page_title="Lojistik Pro | Kurumsal Yönetim", page_icon="🚛", layout="wide")
+# --- 1. KURUMSAL TEMA VE SAYFA AYARLARI ---
+st.set_page_config(page_title="Lojistik Pro Enterprise", page_icon="🏢", layout="wide")
 
-# --- 2. LOGO VE BAŞLIK ---
-def ust_bilgi_ekle():
-    col1, col2 = st.columns([1, 6])
-    with col1:
-        st.image("https://cdn-icons-png.flaticon.com/512/4090/4090434.png", width=90)
-    with col2:
-        st.title("Lojistik Pro: Akıllı Operasyon & Şoför Yönetimi")
-        st.markdown("*Mehmet Emre Türkyılmaz | Profesyonel Lojistik Çözümleri*")
-    st.divider()
+# Kurumsal Stil Tanımlamaları (CSS)
+st.markdown("""
+    <style>
+    .main { background-color: #f8f9fa; }
+    .stButton>button { width: 100%; border-radius: 8px; height: 3.5em; background-color: #002b5b; color: white; transition: 0.3s; }
+    .stButton>button:hover { background-color: #004085; border-color: #004085; }
+    .stAlert { border-radius: 10px; }
+    div[data-testid="stMetricValue"] { color: #002b5b; }
+    </style>
+    """, unsafe_allow_html=True)
 
-# --- 3. GÜVENLİK SİSTEMİ ---
+# --- 2. KULLANICI VE OTURUM YÖNETİMİ ---
+if 'user_db' not in st.session_state:
+    # Başlangıç kullanıcıları
+    st.session_state.user_db = {
+        "admin": {"pw": "12345", "name": "Mehmet Emre Türkyılmaz", "role": "Yönetici"},
+        "sofor": {"pw": "sofor123", "name": "Ahmet Şoför", "role": "Şoför"}
+    }
+
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
-    st.session_state.role = None
+    st.session_state.current_user = None
 
-def giris_paneli():
-    with st.sidebar:
-        st.header("🔐 Güvenli Giriş")
-        kullanici = st.text_input("Kullanıcı Adı")
-        sifre = st.text_input("Şifre", type="password")
-        if st.button("Sisteme Eriş"):
-            if kullanici == "admin" and sifre == "12345":
+# --- 3. YARDIMCI FONKSİYONLAR ---
+def draw_header():
+    col1, col2 = st.columns([1, 6])
+    with col1:
+        st.image("https://cdn-icons-png.flaticon.com/512/4090/4090434.png", width=100)
+    with col2:
+        st.title("Lojistik Pro | Kurumsal Operasyon Portalı")
+        st.caption("Uşak Lojistik Yönetim ve Takip Sistemi")
+    st.divider()
+
+# --- 4. GİRİŞ VE KAYIT EKRANI ---
+if not st.session_state.logged_in:
+    draw_header()
+    tab_log, tab_reg = st.tabs(["🔐 Giriş Yap", "📝 Yeni Kayıt"])
+    
+    with tab_log:
+        u = st.text_input("Kullanıcı Adı")
+        p = st.text_input("Şifre", type="password")
+        if st.button("Sisteme Giriş"):
+            if u in st.session_state.user_db and st.session_state.user_db[u]["pw"] == p:
                 st.session_state.logged_in = True
-                st.session_state.role = "Yönetici"
-                st.rerun()
-            elif kullanici == "sofor" and sifre == "sofor123":
-                st.session_state.logged_in = True
-                st.session_state.role = "Şoför"
+                st.session_state.current_user = u
                 st.rerun()
             else:
-                st.error("Yetkisiz Giriş Denemesi!")
+                st.error("Hatalı kimlik bilgileri.")
 
-# --- 4. ANA PROGRAM AKIŞI ---
-if not st.session_state.logged_in:
-    ust_bilgi_ekle()
-    st.info("Lojistik yönetim paneline erişmek için lütfen giriş yapınız.")
-    giris_paneli()
+    with tab_reg:
+        nu = st.text_input("Yeni Kullanıcı Adı")
+        np = st.text_input("Yeni Şifre", type="password")
+        nn = st.text_input("Ad Soyad")
+        nr = st.selectbox("Görev", ["Şoför", "Yönetici"])
+        if st.button("Kayıt Oluştur"):
+            st.session_state.user_db[nu] = {"pw": np, "name": nn, "role": nr}
+            st.success("Kullanıcı tanımlandı. Lütfen giriş yapın.")
+
+# --- 5. ANA PANEL ---
 else:
-    # --- VERİ BAĞLANTISI ---
-    URL = "https://docs.google.com/spreadsheets/d/SAYFA_ID_BURAYA/edit#gid=0"
+    user = st.session_state.user_db[st.session_state.current_user]
     
+    # Sidebar: Profil ve Acil Durum
+    with st.sidebar:
+        st.title(f"👤 {user['name']}")
+        st.write(f"🏷️ Rol: {user['role']}")
+        st.divider()
+        
+        with st.expander("⚙️ Profil Ayarları"):
+            new_name = st.text_input("İsim Güncelle", value=user['name'])
+            new_pass = st.text_input("Yeni Şifre", type="password")
+            if st.button("Kaydet"):
+                st.session_state.user_db[st.session_state.current_user]['name'] = new_name
+                if new_pass: st.session_state.user_db[st.session_state.current_user]['pw'] = new_pass
+                st.success("Güncellendi!")
+        
+        with st.expander("📂 Özlük Dosyası (SRC/Ehliyet)"):
+            st.file_uploader("Belge Yükle", type=['pdf', 'jpg'])
+            st.date_input("Geçerlilik Tarihi")
+            st.button("Belgeyi Gönder")
+            
+        if st.sidebar.button("🚪 Güvenli Çıkış"):
+            st.session_state.logged_in = False
+            st.rerun()
+
+    draw_header()
+
+    # --- GOOGLE SHEETS VERİ ÇEKME ---
     try:
         conn = st.connection("gsheets", type=GSheetsConnection)
-        df = conn.read(spreadsheet=URL)
-        # Eksik sütunları sanal olarak oluşturma (Hata önleyici)
-        for col in ['ID', 'Alici', 'Durum', 'Mesafe', 'Yakit', 'Sofor_Durumu']:
-            if col not in df.columns:
-                df[col] = "Veri Yok" if col in ['Alici', 'Durum', 'Sofor_Durumu'] else 0
+        df = conn.read(spreadsheet="SAYFA_URL_BURAYA") # Kendi linkinizi buraya koyun
     except:
-        df = pd.DataFrame([{"ID": "TR-101", "Alici": "Ekol Lojistik", "Durum": "Yolda", "Mesafe": 200, "Yakit": 15, "Sofor_Durumu": "Sürüşte"}])
+        # Hata durumunda örnek veriler
+        df = pd.DataFrame([{"ID": "TR-101", "Alici": "Ekol Lojistik", "Durum": "Yolda", "Mesafe": 150, "Sofor_Durumu": "Sürüşte"}])
 
-    ust_bilgi_ekle()
-    st.sidebar.success(f"Oturum Açıldı: {st.session_state.role}")
-
-    # --- A) YÖNETİCİ EKRANI ---
-    if st.session_state.role == "Yönetici":
-        tab1, tab2, tab3 = st.tabs(["📊 Filo Takibi", "😴 Şoför Sağlık/Mola", "⚙️ Veri & Firma Yönetimi"])
-
-        with tab1:
-            st.subheader("📍 Canlı Sevkiyat ve Araç Durumu")
-            st.dataframe(df, use_container_width=True)
-            st.map(pd.DataFrame({'lat': [38.67], 'lon': [29.40]})) # Örnek: Uşak
-
-        with tab2:
-            st.subheader("🕵️ Şoför Yorgunluk ve Dinlenme Takibi")
-            # Şoförlerin durumlarını filtrele
-            st.table(df[['ID', 'Alici', 'Sofor_Durumu']])
-            st.warning("🔔 Hatırlatma: 4.5 saati aşan şoförlere sistem üzerinden mola uyarısı gönderildi.")
-
-        with tab3:
-            st.subheader("🛠️ Sistem Yönetim Merkezi")
-            islem = st.selectbox("İşlem Tipi", ["Yeni Sevkiyat/Firma Ekle", "Kayıt Düzenle/Sil"])
-            
-            if islem == "Yeni Sevkiyat/Firma Ekle":
-                with st.form("ekleme_formu"):
-                    n_id = st.text_input("ID")
-                    n_alici = st.text_input("Şirket/Alıcı Adı")
-                    n_mes = st.number_input("Mesafe", min_value=0)
-                    if st.form_submit_button("Veritabanına Kaydet"):
-                        st.success(f"{n_alici} firması ve sevkiyatı sisteme eklendi.")
-            
-            elif islem == "Kayıt Düzenle/Sil":
-                secilen = st.selectbox("Düzenlenecek Kayıt", df['ID'].tolist())
-                if st.button("❌ Seçili Kaydı Veritabanından Kaldır"):
-                    st.error(f"{secilen} ID'li kayıt silindi.")
-
-    # --- B) ŞOFÖR EKRANI ---
-    elif st.session_state.role == "Şoför":
-        st.subheader("🚚 Sürüş ve Dinlenme Kontrol Paneli")
+    # --- YÖNETİCİ PANELİ ---
+    if user['role'] == "Yönetici":
+        t1, t2, t3, t4 = st.tabs(["📊 Filo Takibi", "📨 İş Atama", "🛡️ Denetim", "🛠️ Yönetim"])
         
-        c1, c2, c3 = st.columns(3)
-        if c1.button("🚛 Sürüşü Başlat"):
-            st.success("Sürüş süresi başlatıldı. İyi yolculuklar!")
-        if c2.button("☕ Mola Ver"):
-            st.info("45 dakikalık mola süreniz başladı.")
-        if c3.button("😴 İstirahate Geç"):
-            st.warning("Uyku modu aktif. Sistem sizi 8 saat sonra uyaracak.")
+        with t1:
+            st.subheader("📍 Canlı Operasyon Merkezi")
+            m1, m2, m3 = st.columns(3)
+            m1.metric("Aktif Araç", len(df))
+            m2.metric("Mesafe Toplamı", f"{df['Mesafe'].sum()} KM")
+            m3.metric("Filo Verimi", "%92")
+            st.map()
+            st.dataframe(df, use_container_width=True)
+
+        with t2:
+            st.subheader("📝 Yeni İş Emri Gönder")
+            with st.form("is_emri"):
+                st.selectbox("Şoför Seç", ["Ahmet Şoför", "Can Lojistik"])
+                st.text_area("Yük Detayı")
+                if st.form_submit_button("İş Emrini Yayınla"): st.success("Görev iletildi.")
+
+        with t3:
+            st.subheader("🚨 Acil Durum & Mesaj Merkezi")
+            st.error("⚠️ Aktif Acil Durum Bildirimi Yok.")
+            st.info("Mesajlar: Şoför Ahmet mola bitişini bildirdi.")
+
+        with t4:
+            st.subheader("⚙️ Veritabanı Yönetimi")
+            secilen = st.selectbox("Kayıt Seç", df['ID'].tolist())
+            if st.button("❌ Seçili Kaydı Sil"): st.warning("Kayıt silindi (Test Modu)")
+
+    # --- ŞOFÖR PANELİ ---
+    elif user['role'] == "Şoför":
+        st.subheader("🚚 Sürüş Kontrol Paneli")
+        
+        # ACİL DURUM BUTONU (Kırmızı)
+        st.error("🚨 ACİL DURUM: Kaza veya Arıza anında hemen basın!")
+        if st.button("🆘 MERKEZE ACİL DURUM SİNYALİ GÖNDER"):
+            st.toast("ACİL DURUM SİNYALİ İLETİLDİ!", icon="🚨")
 
         st.divider()
-        st.subheader("📋 Görev Detayları")
-        st.table(df.head(1)) # Şoföre sadece ilgili görevi göster
-        
-        if st.button("✅ Teslimat QR Kodu Oluştur"):
-            qr = qrcode.make("TESLIM-ONAY-SUCCESS")
-            buf = BytesIO()
-            qr.save(buf, format="PNG")
-            st.image(buf, caption="Teslimat sırasında müşteriye okutun.")
+        c1, c2, c3 = st.columns(3)
+        if c1.button("🚛 Sürüş Başlat"): st.success("Sürüş kaydediliyor.")
+        if c2.button("☕ Mola"): st.info("Mola kaydedildi.")
+        if c3.button("😴 Uyku"): st.warning("İstirahate geçildi.")
 
-    if st.sidebar.button("🚪 Güvenli Çıkış"):
-        st.session_state.logged_in = False
-        st.rerun()
+        st.divider()
+        st.subheader("📩 Gelen Görevler")
+        st.info("📍 Mevcut Görev: Uşak OSB -> İzmir Limanı")
+        if st.button("✅ İşi Onayla"): st.success("İş kabul edildi.")
