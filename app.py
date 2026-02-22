@@ -59,14 +59,21 @@ if not st.session_state.logged_in:
                 st.error("Hatalı kimlik bilgileri.")
 
     with tab_reg:
+        st.subheader("🚚 Yeni Şoför Kaydı")
+        st.info("Bu panel sadece şoför personeli içindir. Yönetici yetkileri sistem yöneticisi tarafından atanır.")
+        
         nu = st.text_input("Yeni Kullanıcı Adı")
         np = st.text_input("Yeni Şifre", type="password")
         nn = st.text_input("Ad Soyad")
-        nr = st.selectbox("Görev", ["Şoför", "Yönetici"])
-        if st.button("Kayıt Oluştur"):
-            st.session_state.user_db[nu] = {"pw": np, "name": nn, "role": nr}
-            st.success("Kullanıcı tanımlandı. Lütfen giriş yapın.")
-
+        
+        # Seçim kutusu kaldırıldı, rol otomatik olarak 'Şoför' atandı
+        if st.button("Şoför Kaydını Tamamla"):
+            if nu and np:
+                # Yeni kayıt otomatik olarak 'Şoför' rolüyle veritabanına eklenir
+                st.session_state.user_db[nu] = {"pw": np, "name": nn, "role": "Şoför"}
+                st.success(f"Sayın {nn}, kaydınız başarıyla oluşturuldu. Giriş yapabilirsiniz.")
+            else:
+                st.error("Lütfen tüm alanları doldurunuz.")
 # --- 5. ANA PANEL ---
 else:
     user = st.session_state.user_db[st.session_state.current_user]
@@ -153,3 +160,4 @@ else:
         st.subheader("📩 Gelen Görevler")
         st.info("📍 Mevcut Görev: Uşak OSB -> İzmir Limanı")
         if st.button("✅ İşi Onayla"): st.success("İş kabul edildi.")
+
