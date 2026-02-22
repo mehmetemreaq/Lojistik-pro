@@ -6,17 +6,67 @@ from PIL import Image
 from io import BytesIO
 import datetime
 
-# --- 1. KURUMSAL TEMA VE SAYFA AYARLARI ---
-st.set_page_config(page_title="Lojistik Pro Enterprise", page_icon="🏢", layout="wide")
+# --- KURUMSAL TEMA VE GÜÇLENDİRİLMİŞ CSS ---
+st.set_page_config(page_title="Lojistik Pro | Enterprise", page_icon="🏢", layout="wide")
 
-# Kurumsal Stil Tanımlamaları (CSS)
 st.markdown("""
     <style>
-    .main { background-color: #f8f9fa; }
-    .stButton>button { width: 100%; border-radius: 8px; height: 3.5em; background-color: #002b5b; color: white; transition: 0.3s; }
-    .stButton>button:hover { background-color: #004085; border-color: #004085; }
-    .stAlert { border-radius: 10px; }
-    div[data-testid="stMetricValue"] { color: #002b5b; }
+    /* Ana Arka Plan */
+    .stApp {
+        background: linear-gradient(135deg, #f0f2f6 0%, #dfe4ea 100%);
+    }
+    
+    /* Sidebar (Yan Menü) Tasarımı */
+    [data-testid="stSidebar"] {
+        background-color: #001e3c !important;
+        color: white;
+    }
+    
+    /* Kart Yapıları */
+    div.stBlock {
+        background-color: white;
+        padding: 20px;
+        border-radius: 15px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        border: 1px solid #e1e4e8;
+    }
+    
+    /* Buton Tasarımları */
+    .stButton>button {
+        width: 100%;
+        border-radius: 12px;
+        height: 3.5em;
+        background: linear-gradient(90deg, #002b5b 0%, #004085 100%);
+        color: white;
+        font-weight: 600;
+        border: none;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    
+    .stButton>button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+        background: linear-gradient(90deg, #004085 0%, #0056b3 100%);
+    }
+
+    /* Tablo ve Başlık Yazıları */
+    h1, h2, h3 {
+        color: #001e3c;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    /* Metrik Değerleri */
+    div[data-testid="stMetricValue"] {
+        color: #002b5b;
+        font-size: 2rem;
+        font-weight: 700;
+    }
+    
+    /* Giriş Kutuları */
+    .stTextInput>div>div>input {
+        border-radius: 8px;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -160,4 +210,5 @@ else:
         st.subheader("📩 Gelen Görevler")
         st.info("📍 Mevcut Görev: Uşak OSB -> İzmir Limanı")
         if st.button("✅ İşi Onayla"): st.success("İş kabul edildi.")
+
 
