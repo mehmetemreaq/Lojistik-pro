@@ -57,14 +57,21 @@ else:
     URL = "https://docs.google.com/spreadsheets/d/17yIQDnXsoavEpYQuusPf_n-Vu5jVZycjCwk2N_qvPiE/edit?usp=sharing"
     
     try:
-        conn = st.connection("gsheets", type=GSheetsConnection)
-        df = conn.read(spreadsheet=URL)
-    except:
-        # Veritabanı bağlı değilse gösterilecek taslak veriler
-        df = pd.DataFrame([
-            {"ID": "TR-101", "Alici": "Ekol Lojistik", "Durum": "Yolda", "Yakit": 12.5, "Mesafe": 150, "Trafik": 3, "Hava": "Güneşli"},
-            {"ID": "TR-102", "Alici": "Libex Denizli", "Durum": "Yüklendi", "Yakit": 14.2, "Mesafe": 220, "Trafik": 4, "Hava": "Yağmurlu"}
-        ])
+    conn = st.connection("gsheets", type=GSheetsConnection)
+    df = conn.read(spreadsheet=URL)
+    
+    # EKSİK SÜTUNLARI OTOMATİK TAMAMLAMA (Kritik Bölge)
+    gereken_sutunlar = ['Mesafe', 'Yakit', 'Trafik', 'Alici', 'Durum', 'Hava', 'ID']
+    for sutun in gereken_sutunlar:
+        if sutun not in df.columns:
+            df[sutun] = 0  # Eğer Excel'de yoksa sütunu 0 olarak sanal oluştur
+            
+except Exception as e:
+    # Eğer Sheets bağlantısında hata olursa veya dosya boşsa bu verileri kullan
+    df = pd.DataFrame([
+        {"ID": "TR-101", "Alici": "Ekol Lojistik", "Durum": "Yolda", "Yakit": 12.5, "Mesafe": 150, "Trafik": 3, "Hava": "Güneşli"},
+        {"ID": "TR-102", "Alici": "Libex Denizli", "Durum": "Yüklendi", "Yakit": 14.2, "Mesafe": 220, "Trafik": 4, "Hava": "Yağmurlu"}
+    ])
 
     ust_bilgi_ekle()
     st.sidebar.success(f"Yetki: {st.session_state.role}")
@@ -144,4 +151,5 @@ else:
 # streamlit-gsheets-connection
 # qrcode
 # Pillow
+
 
