@@ -4,75 +4,26 @@ from streamlit_gsheets import GSheetsConnection
 import qrcode
 from PIL import Image
 from io import BytesIO
-import datetime
 
-# --- KURUMSAL TEMA VE GÜÇLENDİRİLMİŞ CSS ---
-st.set_page_config(page_title="Lojistik Pro | Enterprise", page_icon="🏢", layout="wide")
+# --- 1. KURUMSAL TEMA VE CSS ---
+st.set_page_config(page_title="Lojistik Pro Enterprise", page_icon="🏢", layout="wide")
 
 st.markdown("""
     <style>
-    /* Ana Arka Plan */
-    .stApp {
-        background: linear-gradient(135deg, #f0f2f6 0%, #dfe4ea 100%);
+    .stApp { background: linear-gradient(135deg, #f0f2f6 0%, #dfe4ea 100%); }
+    [data-testid="stSidebar"] { background-color: #001e3c !important; color: white; }
+    .stButton>button { 
+        width: 100%; border-radius: 12px; height: 3.5em; 
+        background: linear-gradient(90deg, #002b5b 0%, #004085 100%); 
+        color: white; font-weight: 600; border: none; transition: 0.3s;
     }
-    
-    /* Sidebar (Yan Menü) Tasarımı */
-    [data-testid="stSidebar"] {
-        background-color: #001e3c !important;
-        color: white;
-    }
-    
-    /* Kart Yapıları */
-    div.stBlock {
-        background-color: white;
-        padding: 20px;
-        border-radius: 15px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        border: 1px solid #e1e4e8;
-    }
-    
-    /* Buton Tasarımları */
-    .stButton>button {
-        width: 100%;
-        border-radius: 12px;
-        height: 3.5em;
-        background: linear-gradient(90deg, #002b5b 0%, #004085 100%);
-        color: white;
-        font-weight: 600;
-        border: none;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    }
-    
-    .stButton>button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(0,0,0,0.15);
-        background: linear-gradient(90deg, #004085 0%, #0056b3 100%);
-    }
-
-    /* Tablo ve Başlık Yazıları */
-    h1, h2, h3 {
-        color: #001e3c;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }
-    
-    /* Metrik Değerleri */
-    div[data-testid="stMetricValue"] {
-        color: #002b5b;
-        font-size: 2rem;
-        font-weight: 700;
-    }
-    
-    /* Giriş Kutuları */
-    .stTextInput>div>div>input {
-        border-radius: 8px;
-    }
+    .stButton>button:hover { transform: translateY(-2px); background: #0056b3; }
+    div[data-testid="stMetricValue"] { color: #002b5b; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. KULLANICI VE OTURUM YÖNETİMİ ---
+# --- 2. KULLANICI VERİTABANI VE OTURUM ---
 if 'user_db' not in st.session_state:
-    # Başlangıç kullanıcıları
     st.session_state.user_db = {
         "admin": {"pw": "12345", "name": "Mehmet Emre Türkyılmaz", "role": "Yönetici"},
         "sofor": {"pw": "sofor123", "name": "Ahmet Şoför", "role": "Şoför"}
@@ -82,178 +33,130 @@ if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.current_user = None
 
-# --- 3. YARDIMCI FONKSİYONLAR ---
+# --- 3. GOOGLE SHEETS BAĞLANTISI ---
+# NOT: Buradaki URL kısmına kendi Google Sheets linkinizi yapıştırın
+URL = "https://docs.google.com/spreadsheets/d/17yIQDnXsoavEpYQuusPf_n-Vu5jVZycjCwk2N_qvPiE/edit?usp=sharing"
+
+try:
+    conn = st.connection("gsheets", type=GSheetsConnection)
+    df = conn.read(spreadsheet=URL)
+    # Eksik sütunları koruma altına al
+    for col in ['ID', 'Alici', 'Durum', 'Mesafe', 'Yakit', 'Sofor_Durumu']:
+        if col not in df.columns:
+            df[col] = "Belirtilmedi" if col in ['Alici', 'Durum', 'Sofor_Durumu'] else 0
+except Exception as e:
+    st.error(f"Veri Bağlantı Hatası: {e}")
+    df = pd.DataFrame([{"ID": "HATA", "Alici": "Bağlantı Yok", "Durum": "Yok", "Mesafe": 0, "Yakit": 0, "Sofor_Durumu": "Yok"}])
+
+# --- 4. GİRİŞ VE KAYIT SİSTEMİ ---
 def draw_header():
     col1, col2 = st.columns([1, 6])
-    with col1:
-        st.image("https://cdn-icons-png.flaticon.com/512/4090/4090434.png", width=100)
-    with col2:
+    with col1: st.image("https://cdn-icons-png.flaticon.com/512/4090/4090434.png", width=90)
+    with col2: 
         st.title("Lojistik Pro | Kurumsal Operasyon Portalı")
-        st.caption("Uşak Lojistik Yönetim ve Takip Sistemi")
+        st.caption("Uşak Lojistik Yönetimi - Profesyonel Takip Sistemi")
     st.divider()
 
-# --- 4. GİRİŞ VE KAYIT EKRANI ---
 if not st.session_state.logged_in:
     draw_header()
-    tab_log, tab_reg = st.tabs(["🔐 Giriş Yap", "📝 Yeni Kayıt"])
-    
-    with tab_log:
+    t_login, t_signup = st.tabs(["🔐 Giriş Yap", "📝 Şoför Kaydı"])
+    with t_login:
         u = st.text_input("Kullanıcı Adı")
         p = st.text_input("Şifre", type="password")
-        if st.button("Sisteme Giriş"):
+        if st.button("Sisteme Eriş"):
             if u in st.session_state.user_db and st.session_state.user_db[u]["pw"] == p:
                 st.session_state.logged_in = True
                 st.session_state.current_user = u
                 st.rerun()
-            else:
-                st.error("Hatalı kimlik bilgileri.")
-
-    with tab_reg:
-        st.subheader("🚚 Yeni Şoför Kaydı")
-        st.info("Bu panel sadece şoför personeli içindir. Yönetici yetkileri sistem yöneticisi tarafından atanır.")
-        
+            else: st.error("Hatalı Giriş!")
+    with t_signup:
         nu = st.text_input("Yeni Kullanıcı Adı")
         np = st.text_input("Yeni Şifre", type="password")
         nn = st.text_input("Ad Soyad")
-        
-        # Seçim kutusu kaldırıldı, rol otomatik olarak 'Şoför' atandı
-        if st.button("Şoför Kaydını Tamamla"):
-            if nu and np:
-                # Yeni kayıt otomatik olarak 'Şoför' rolüyle veritabanına eklenir
-                st.session_state.user_db[nu] = {"pw": np, "name": nn, "role": "Şoför"}
-                st.success(f"Sayın {nn}, kaydınız başarıyla oluşturuldu. Giriş yapabilirsiniz.")
-            else:
-                st.error("Lütfen tüm alanları doldurunuz.")
+        if st.button("Şoför Olarak Kaydol"):
+            st.session_state.user_db[nu] = {"pw": np, "name": nn, "role": "Şoför"}
+            st.success("Kayıt başarılı! Giriş yapabilirsiniz.")
+
 # --- 5. ANA PANEL ---
 else:
     user = st.session_state.user_db[st.session_state.current_user]
     
-    # Sidebar: Profil ve Acil Durum
     with st.sidebar:
         st.title(f"👤 {user['name']}")
-        st.write(f"🏷️ Rol: {user['role']}")
+        st.write(f"💼 Yetki: {user['role']}")
         st.divider()
-        
-        with st.expander("⚙️ Profil Ayarları"):
-            new_name = st.text_input("İsim Güncelle", value=user['name'])
-            new_pass = st.text_input("Yeni Şifre", type="password")
-            if st.button("Kaydet"):
-                st.session_state.user_db[st.session_state.current_user]['name'] = new_name
-                if new_pass: st.session_state.user_db[st.session_state.current_user]['pw'] = new_pass
-                st.success("Güncellendi!")
-        
-        with st.expander("📂 Özlük Dosyası (SRC/Ehliyet)"):
-            st.file_uploader("Belge Yükle", type=['pdf', 'jpg'])
-            st.date_input("Geçerlilik Tarihi")
-            st.button("Belgeyi Gönder")
-            
-        if st.sidebar.button("🚪 Güvenli Çıkış"):
+        with st.expander("⚙️ Profil & Belgeler"):
+            st.file_uploader("Ehliyet/SRC Yükle", type=['pdf', 'jpg'])
+            if st.button("Şifre Değiştir"): st.info("Bu özellik yakında aktif olacak.")
+        if st.button("🚪 Güvenli Çıkış"):
             st.session_state.logged_in = False
             st.rerun()
 
     draw_header()
 
-    # --- GOOGLE SHEETS VERİ ÇEKME ---
-    try:
-        conn = st.connection("gsheets", type=GSheetsConnection)
-        df = conn.read(spreadsheet="SAYFA_URL_BURAYA") # Kendi linkinizi buraya koyun
-    except:
-        # Hata durumunda örnek veriler
-        df = pd.DataFrame([{"ID": "TR-101", "Alici": "Ekol Lojistik", "Durum": "Yolda", "Mesafe": 150, "Sofor_Durumu": "Sürüşte"}])
-
-    # --- YÖNETİCİ PANELİ ---
+    # --- A) YÖNETİCİ PANELİ (CRUD İŞLEMLERİ) ---
     if user['role'] == "Yönetici":
-        t1, t2, t3, t4 = st.tabs(["📊 Filo Takibi", "📨 İş Atama", "🛡️ Denetim", "🛠️ Yönetim"])
+        tab1, tab2, tab3 = st.tabs(["📊 Filo Analizi", "⚙️ Kayıt Yönetimi (Ekle/Sil/Düzenle)", "🚨 Acil Durumlar"])
         
-        with t1:
-            st.subheader("📍 Canlı Operasyon Merkezi")
+        with tab1:
             m1, m2, m3 = st.columns(3)
-            m1.metric("Aktif Araç", len(df))
-            m2.metric("Mesafe Toplamı", f"{df['Mesafe'].sum()} KM")
-            m3.metric("Filo Verimi", "%92")
-            st.map()
+            m1.metric("Toplam Araç", len(df))
+            m2.metric("Toplam Yol", f"{df['Mesafe'].sum()} KM")
+            m3.metric("Ort. Yakıt", f"{df['Yakit'].mean():.1f} L")
             st.dataframe(df, use_container_width=True)
+            st.map()
 
-        with t2:
-            st.subheader("📝 Yeni İş Emri Gönder")
-            with st.form("is_emri"):
-                st.selectbox("Şoför Seç", ["Ahmet Şoför", "Can Lojistik"])
-                st.text_area("Yük Detayı")
-                if st.form_submit_button("İş Emrini Yayınla"): st.success("Görev iletildi.")
+        with tab2:
+            islem = st.radio("İşlem Seçin:", ["Yeni Kayıt Ekle", "Kayıt Güncelle", "Kayıt Sil"])
+            
+            if islem == "Yeni Kayıt Ekle":
+                with st.form("ekle_form"):
+                    f_id = st.text_input("Sipariş ID")
+                    f_alici = st.text_input("Alıcı Firma")
+                    f_durum = st.selectbox("Durum", ["Yüklendi", "Yolda", "Teslim Edildi"])
+                    if st.form_submit_button("Excel'e Kaydet"):
+                        yeni_df = pd.concat([df, pd.DataFrame([{"ID": f_id, "Alici": f_alici, "Durum": f_durum, "Mesafe": 0, "Yakit": 0}])], ignore_index=True)
+                        conn.update(spreadsheet=URL, data=yeni_df)
+                        st.success("Kayıt başarıyla eklendi!")
+                        st.rerun()
 
-        with t3:
-            st.subheader("🚨 Acil Durum & Mesaj Merkezi")
-            st.error("⚠️ Aktif Acil Durum Bildirimi Yok.")
-            st.info("Mesajlar: Şoför Ahmet mola bitişini bildirdi.")
+            elif islem == "Kayıt Güncelle":
+                secilen = st.selectbox("Düzenlenecek ID", df['ID'].tolist())
+                y_durum = st.selectbox("Yeni Durum", ["Yüklendi", "Yolda", "Teslim Edildi"])
+                if st.button("Güncellemeyi Onayla"):
+                    df.loc[df['ID'] == secilen, 'Durum'] = y_durum
+                    conn.update(spreadsheet=URL, data=df)
+                    st.success("Bilgiler güncellendi!")
+                    st.rerun()
 
-        with t4:
-            st.subheader("⚙️ Veritabanı Yönetimi")
-            secilen = st.selectbox("Kayıt Seç", df['ID'].tolist())
-            if st.button("❌ Seçili Kaydı Sil"): st.warning("Kayıt silindi (Test Modu)")
+            elif islem == "Kayıt Sil":
+                sil_id = st.selectbox("Silinecek ID", df['ID'].tolist())
+                if st.button("❌ KALICI OLARAK SİL"):
+                    yeni_df = df[df['ID'] != sil_id]
+                    conn.update(spreadsheet=URL, data=yeni_df)
+                    st.warning("Kayıt veritabanından silindi!")
+                    st.rerun()
 
-    # --- ŞOFÖR PANELİ ---
+        with tab3:
+            st.subheader("🛡️ Acil Durum Denetimi")
+            acil_vaka = df[df['Sofor_Durumu'] == 'ACİL']
+            if not acil_vaka.empty: st.error(f"DİKKAT: {len(acil_vaka)} adet acil bildirim var!")
+            else: st.success("Şu an aktif bir acil durum bildirimi bulunmamaktadır.")
+
+    # --- B) ŞOFÖR PANELİ ---
     elif user['role'] == "Şoför":
-        st.subheader("🚚 Sürüş Kontrol Paneli")
+        st.subheader("🚚 Sürüş Yönetim Paneli")
+        st.error("🆘 ACİL DURUM: Kaza/Arıza anında butona basın!")
+        if st.button("MERKEZE SİNYAL GÖNDER"): 
+            st.toast("Sinyal İletildi!", icon="🚨")
         
-        # ACİL DURUM BUTONU (Kırmızı)
-        st.error("🚨 ACİL DURUM: Kaza veya Arıza anında hemen basın!")
-        if st.button("🆘 MERKEZE ACİL DURUM SİNYALİ GÖNDER"):
-            st.toast("ACİL DURUM SİNYALİ İLETİLDİ!", icon="🚨")
-
         st.divider()
         c1, c2, c3 = st.columns(3)
-        if c1.button("🚛 Sürüş Başlat"): st.success("Sürüş kaydediliyor.")
-        if c2.button("☕ Mola"): st.info("Mola kaydedildi.")
-        if c3.button("😴 Uyku"): st.warning("İstirahate geçildi.")
+        if c1.button("🚛 Sürüş Başlat"): st.success("Sürüş başladı.")
+        if c2.button("☕ Mola Ver"): st.info("Mola kaydedildi.")
+        if c3.button("😴 İstirahat"): st.warning("Uyku modu aktif.")
 
         st.divider()
         st.subheader("📩 Gelen Görevler")
-        st.info("📍 Mevcut Görev: Uşak OSB -> İzmir Limanı")
-        if st.button("✅ İşi Onayla"): st.success("İş kabul edildi.")
-
-# --- GOOGLE SHEETS BAĞLANTISI ---
-# Not: spreadsheet parametresi için sadece sayfanın adını veya URL'sini kullanın.
-try:
-    conn = st.connection("gsheets", type=GSheetsConnection)
-    # Veriyi Oku
-    df = conn.read(spreadsheet="SİZİN_GOOGLE_SHEETS_LİNKİNİZ")
-except Exception as e:
-    st.error(f"Bağlantı Hatası: {e}")
-
-if user['role'] == "Yönetici":
-    t_yonetim = st.tabs(["⚙️ Kayıt Yönetimi"])[0]
-    
-    with t_yonetim:
-        islem = st.radio("Yapmak İstediğiniz İşlem:", ["Yeni Kayıt Ekle", "Kayıt Düzenle", "Kayıt Sil"])
-
-        # --- EKLEME ---
-        if islem == "Yeni Kayıt Ekle":
-            with st.form("ekle"):
-                f1 = st.text_input("ID (Örn: TR-500)")
-                f2 = st.text_input("Alıcı Firma")
-                f3 = st.selectbox("Durum", ["Yüklendi", "Yolda", "Teslim Edildi"])
-                if st.form_submit_button("Veritabanına Kaydet"):
-                    yeni_satir = pd.DataFrame([{"ID": f1, "Alici": f2, "Durum": f3, "Mesafe": 0, "Yakit": 0}])
-                    guncel_df = pd.concat([df, yeni_satir], ignore_index=True)
-                    conn.update(spreadsheet="SİZİN_GOOGLE_SHEETS_LİNKİNİZ", data=guncel_df)
-                    st.success("Yeni kayıt eklendi!")
-                    st.rerun()
-
-        # --- DÜZENLEME ---
-        elif islem == "Kayıt Düzenle":
-            secilen_id = st.selectbox("Düzenlenecek ID", df['ID'].tolist())
-            yeni_durum = st.selectbox("Yeni Durum Atayın", ["Yüklendi", "Yolda", "Teslim Edildi"])
-            if st.button("Güncellemeyi Kaydet"):
-                df.loc[df['ID'] == secilen_id, 'Durum'] = yeni_durum
-                conn.update(spreadsheet="SİZİN_GOOGLE_SHEETS_LİNKİNİZ", data=df)
-                st.success("Kayıt güncellendi!")
-                st.rerun()
-
-        # --- SİLME ---
-        elif islem == "Kayıt Sil":
-            silinecek_id = st.selectbox("Silinecek ID", df['ID'].tolist())
-            if st.button("❌ KALICI OLARAK SİL"):
-                guncel_df = df[df['ID'] != silinecek_id]
-                conn.update(spreadsheet="SİZİN_GOOGLE_SHEETS_LİNKİNİZ", data=guncel_df)
-                st.warning("Kayıt veritabanından silindi!")
-                st.rerun()
+        st.info("📌 Görev: Uşak Merkez -> Uşak OSB (Tekstil Hammaddesi)")
+        if st.button("✅ İşi Kabul Et"): st.success("Görev onaylandı.")
